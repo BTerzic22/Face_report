@@ -1,0 +1,8 @@
+README.md
+pyproject.toml
+setup.cfg
+src/__init__.py
+src/Face_report.egg-info/PKG-INFO
+src/Face_report.egg-info/SOURCES.txt
+src/Face_report.egg-info/dependency_links.txt
+src/Face_report.egg-info/top_level.txt

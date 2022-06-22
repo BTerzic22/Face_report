@@ -1,0 +1,24 @@
+Metadata-Version: 2.1
+Name: Face-report
+Version: 1.0.0
+Summary: Face report
+Home-page: https://github.com/BTerzic22/Face_report
+Author: Boris Terzic
+Classifier: License :: Free for non-commercial use
+Classifier: Natural Language :: English
+Classifier: Programming Language :: Python :: 3.9
+Classifier: Topic :: Scientific/Engineering :: Image Processing
+Requires-Python: >=3.9
+Description-Content-Type: text/markdown
+
+# Face report
+
+## Extract and compile patients' reviews on sleep apnea masks for R&D
+
+
+
+**Warnings**:
+
+
+
+**PS:** The program is still under development. I intend to make it more efficient, cleaner and add a sharing feature.
