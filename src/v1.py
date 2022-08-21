@@ -22,19 +22,21 @@ def mask_dilution(im_cal):
     dilated_mask = im_cal.copy()
     # calculate the limits for erosion intensity
         #lim_up, lim_down = round(im_cal.shape[0]*2/5), round(im_cal.shape[0]*4.25/5)
-    lim_left, lim_right = round(im_cal.shape[1]*1/3), round(im_cal.shape[1]*2/3)
+    lim_left, lim_right = round(im_cal.shape[1]*1/4), round(im_cal.shape[1]*3/4)
     # apply erosion on the five defined areas
         #dil_in = morphology.erosion(im_cal[lim_up:lim_down, lim_left:lim_right], morphology.disk(30))
         #dil_right = morphology.erosion(im_cal[:, lim_right:], morphology.disk(30))
         #dil_up = morphology.erosion(im_cal[:lim_up, :], morphology.disk(30))
         #dil_down = morphology.erosion(im_cal[lim_down:, :], morphology.disk(35))
         #dil_left = morphology.erosion(im_cal[:, :lim_left], morphology.disk(40))
-    dil_left = morphology.erosion(im_cal[:, :lim_left], morphology.disk(40))
-    dil_right = morphology.erosion(im_cal[:, lim_left:], morphology.disk(30))
+    dil_left = morphology.erosion(im_cal[:, :lim_left], morphology.disk(12))
+    dil_right = morphology.erosion(im_cal[:, lim_right:], morphology.disk(12))
+    dil_inner = morphology.erosion(im_cal[:, lim_left:lim_right], morphology.disk(8))
     # update the mask with the eroded areas
         #dilated_mask[lim_up:lim_down, lim_left:lim_right] = dil_in
-    dilated_mask[:, lim_left:] = dil_right
+    dilated_mask[:, lim_right:] = dil_right
     dilated_mask[:, :lim_left] = dil_left
+    dilated_mask[:, lim_left:lim_right] = dil_inner
         #dilated_mask[:lim_up, :] = dil_up
         #dilated_mask[lim_down:, :] = dil_down
     # convert to numpy array
@@ -62,10 +64,11 @@ def bordure_detection(face, cal):
               edges, # Input edge image
               1.5, # Distance resolution in pixels
               np.pi/180, # Angle resolution in radians
-              threshold=80, # Min number of votes for valid line
+              threshold=40, # Min number of votes for valid line
               minLineLength=40, # Min allowed length of line
               maxLineGap=15 # Max allowed gap between line for joining them
               )
+    
     X, Y = list(), list()
   # Iterate over points
     if type(lines)== None:
@@ -76,11 +79,11 @@ def bordure_detection(face, cal):
         # Get margins
         # Select only vertical lines for non ref image
         if cal==0:
-          if y1 != y2 and np.abs(x1-x2) < 50:
+          if y1 != y2 and np.abs(x1-x2) <= 2:
             X.append(x1); X.append(x2)
             Y.append(y1); Y.append(y2)
         # Select only vertical lines for ref image
-        elif np.abs(x1-x2) < 50 :
+        elif np.abs(x1-x2) < 5 :
           # Maintain a simples lookup list for points
           X.append(x1); X.append(x2)
           Y.append(y1); Y.append(y2)
@@ -130,11 +133,13 @@ def check_annotation(contour, cross_dots):
         return check, row_center, col_center
     elif col_center < margins or col_center > cross_dots.shape[1]-margins:
         return check, row_center, col_center
+    else:
+        check = True
     # selection of a plausible area to make sur to not select a small stain as a contour
-    if row_center > cross_dots.shape[0] * 2/5:
-        check = True
-    elif col_center > cross_dots.shape[1] * 2/5 and col_center < cross_dots.shape[1] * 3/5:
-        check = True
+    #if row_center > cross_dots.shape[0] * 2/5:
+    #    check = True
+    #elif col_center > cross_dots.shape[1] * 2/5 and col_center < cross_dots.shape[1] * 3/5:
+    #    check = True
     return check, row_center, col_center
 
 
@@ -155,8 +160,8 @@ def duplicates_finder(contours_storage):
             if center == contours_storage[i] or center in del_list:
                 i+=1
                 continue
-            elif center[0] >= (contours_storage[i][0] - 35) and center[0] <= (contours_storage[i][0] + 35):
-                if center[1] >= (contours_storage[i][1] - 35) and center[1] <= (contours_storage[i][1] + 35):
+            elif center[0] >= (contours_storage[i][0] - 12) and center[0] <= (contours_storage[i][0] + 12):
+                if center[1] >= (contours_storage[i][1] - 12) and center[1] <= (contours_storage[i][1] + 12):
                     del_list.append(contours_storage[i])
             i+=1
         contours_storage = [var for var in contours_storage if var not in del_list]
@@ -213,7 +218,7 @@ def store_contours(cross_dots):
 def circles_detector(cross_dots):
     # finds the circles in the grayscale image using the Hough transform
     circles = cv2.HoughCircles(image=cross_dots, method=cv2.HOUGH_GRADIENT, dp=2, 
-                                minDist=50, param1=300, param2=25, minRadius=2, maxRadius=30)
+                                minDist=20, param1=300, param2=10, minRadius=2, maxRadius=30)
     circle_centers=list()
 
     if circles is not None:
@@ -234,7 +239,7 @@ def sep_cross(contours_storage, circle_centers, im_thresh):
 
     for i in range(len(cross_centers)):
         for j in range(len(circle_centers)):
-            if (cross_centers[i][0] >= circle_centers[j][0]-30) and (cross_centers[i][1] >= circle_centers[j][1]-30) and (cross_centers[i][0] <= circle_centers[j][0]+30) and (cross_centers[i][1] <= circle_centers[j][1]+30):
+            if (cross_centers[i][0] >= circle_centers[j][0]-10) and (cross_centers[i][1] >= circle_centers[j][1]-10) and (cross_centers[i][0] <= circle_centers[j][0]+10) and (cross_centers[i][1] <= circle_centers[j][1]+10):
                 cross_centers[i] = (0,0)
     cross_centers = [i for i in cross_centers if i != (0, 0)]
     cross_centers = ellipsis_filter(cross_centers, im_thresh)
@@ -373,7 +378,7 @@ def main():
 
         contours_storage = store_contours(cross_dots)
         # if there are too many marks we assume there is a problem reading the file
-        if len(contours_storage) > 15:
+        if len(contours_storage) > 10:
             print("There is probably an issue processing this image. We skip it for safety.")
             message='Too much marks'
             coord_df = non_nominal_update_df(coord_df, message, file_id, local_im)
@@ -391,12 +396,13 @@ def main():
         if len(circle_centers)==0 and len(cross_centers)==0:
             print("No marks detected!")
             message='No marks'
+            images_to_test.append(im_thresh)
             coord_df = non_nominal_update_df(coord_df, message, file_id, local_im)
         else:
             coord_df = update_df(coord_df, circle_centers, cross_centers, file_id, local_im)
         images_to_test.append(im_thresh)
         file_id+=1
-
+        
     # save the whole dataframe as an excel file
     pd_to_csv(coord_df)
 
@@ -404,7 +410,6 @@ def main():
     print('Plotting results in progress')
     verification_by_image(images_to_test, coord_df)
     compil_cross_and_circles(coord_df, im_cal)
-
 
 if __name__ == "__main__":
     start = time.time()
