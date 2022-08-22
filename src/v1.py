@@ -322,17 +322,17 @@ def compil_cross_and_circles(coord_df, im_cal):
     data2 = coord_df[coord_df['type']=='cross']
 
     fig, ax = plt.subplots(1,2, sharey = True, sharex = True, figsize=[20, 15])
-    plt.suptitle("Compilation of patients reviews points")
+    plt.suptitle("Compilation of annotations")
 
     ax[0].imshow(im_cal, cmap=plt.cm.gray)
     ax[0].set_yticks([])
     ax[0].set_xticks([])
-    ax[0].set_title('Over Pressure areas')
+    ax[0].set_title('Circles')
     # warning: x and y axis are inverted in the reference image
     sns.scatterplot(data = data1 , y = 'coord_x', x = 'coord_y', color = 'r', alpha=a, s=s, ax=ax[0])
 
     ax[1].imshow(im_cal, cmap=plt.cm.gray)
-    ax[1].set_title('Leaks areas')
+    ax[1].set_title('Crosses')
     sns.scatterplot(data = data2 , y = 'coord_x', x = 'coord_y', color = 'b', alpha=a, s=s, ax=ax[1])
     sns.despine()
 
