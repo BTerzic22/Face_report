@@ -16,10 +16,8 @@ The algorithm should perform the following tasks:
 The actual version of the code is only working to extract insights from png images in a repository.
 A new version will be realesed to work with pdf.
 
-Here is a sample of the current result: (Circles are circled with a larger radius than cross)
-| Before analysis | After analysis |
-| ----------- | ----------- |
-| ![alt](v1/7.PNG) | ![alt](Analysis_report/6.jpeg) |
+Here is a sample of the current result:
+![GitHub projects](https://user-images.githubusercontent.com/104162893/185877030-e8767580-8e25-44e5-ba1c-cec10eb32f33.jpg)
 
 **Potential issues anticipated so far**:
 - A bad scan prevent a good cropping. In those cases it is detected by the program.
