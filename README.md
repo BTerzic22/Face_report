@@ -17,10 +17,9 @@ The actual version of the code is only working to extract insights from png imag
 A new version will be realesed to work with pdf.
 
 Here is a sample of the current result: (Circles are circled with a larger radius than cross)
-- Before analysis:
-![alt](v1/7.PNG)
-- After analysis:
-![alt](Analysis_report/6.jpeg)
+| Before analysis | After analysis |
+| ----------- | ----------- |
+| ![alt](v1/7.PNG) | ![alt](Analysis_report/6.jpeg) |
 
 **Potential issues anticipated so far**:
 - A bad scan prevent a good cropping. In those cases it is detected by the program.
