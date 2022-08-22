@@ -32,9 +32,12 @@ Here is a sample of the current result: (Circles are circled with a larger radiu
     - Put your input images in the v1 folder as png.
     - Have your model image in the Reference folder.
     - Have an empty Analysis_report folder.
+    - Change the parameters to adapt it to your files (i.e: the CV2 Houghlines and Houghcircles functions parameters, the spaces between duplicates) --> see in post scriptum.
 - What you get after executing the code:
     - A csv file (cross_circles_coord.csv) with each file id with its original name from v1 folder, the coordinates of each annotation an image has and its type, and a message explaining if nothing was extracted from an image.
     - An image (Compilation.jpeg) with the visual compilation of all cross on one face and all circles on another.
     - The execution time in the terminal.
 
-**PS:** The program is still under development. I intend to make it more efficient, cleaner and add a sharing feature.
+**PS:** 
+The parameters to change depending on your files will be accessible in one place in the next update.
+The program is still under development. I intend to make it more efficient, cleaner and add a sharing feature.
