@@ -11,40 +11,37 @@ import glob, cv2, os, time
 
 
 def df_creator():
-    # Create the dataframe
+    """Creates the dataframe to store analysis results
+    Returns the dataframe
+    """
     coord_df = pd.DataFrame()
     coord_df[['file_id', 'file_name', 'tuple_coord', 'coord_x', 'coord_y', 'type']] = 0
     return coord_df
 
 
 def mask_dilution(im_cal):
+    """Modifies the reference image to create a mask which will be used on images to analyse
+    Returns the mask
+    """
     # make a copy of ref image
     dilated_mask = im_cal.copy()
-    # calculate the limits for erosion intensity
-        #lim_up, lim_down = round(im_cal.shape[0]*2/5), round(im_cal.shape[0]*4.25/5)
     lim_left, lim_right = round(im_cal.shape[1]*1/4), round(im_cal.shape[1]*3/4)
-    # apply erosion on the five defined areas
-        #dil_in = morphology.erosion(im_cal[lim_up:lim_down, lim_left:lim_right], morphology.disk(30))
-        #dil_right = morphology.erosion(im_cal[:, lim_right:], morphology.disk(30))
-        #dil_up = morphology.erosion(im_cal[:lim_up, :], morphology.disk(30))
-        #dil_down = morphology.erosion(im_cal[lim_down:, :], morphology.disk(35))
-        #dil_left = morphology.erosion(im_cal[:, :lim_left], morphology.disk(40))
     dil_left = morphology.erosion(im_cal[:, :lim_left], morphology.disk(12))
     dil_right = morphology.erosion(im_cal[:, lim_right:], morphology.disk(12))
     dil_inner = morphology.erosion(im_cal[:, lim_left:lim_right], morphology.disk(8))
     # update the mask with the eroded areas
-        #dilated_mask[lim_up:lim_down, lim_left:lim_right] = dil_in
     dilated_mask[:, lim_right:] = dil_right
     dilated_mask[:, :lim_left] = dil_left
     dilated_mask[:, lim_left:lim_right] = dil_inner
-        #dilated_mask[:lim_up, :] = dil_up
-        #dilated_mask[lim_down:, :] = dil_down
     # convert to numpy array
     dilated_mask = np.array(dilated_mask)*1
     return dilated_mask
 
 
 def initialize():
+    """Initializes the variables needed for the program
+    Returns those variables
+    """
     im_cal = calibration()
     coord_df = df_creator()
     file_id, images_to_test = 0, list()
@@ -55,6 +52,10 @@ def initialize():
 
 
 def bordure_detection(face, cal):
+    """Detects the vertical lines in the image which will be used later for cropping. If nothing
+     is detected, an error value will be returned.
+    Returns the coordinates and the error statement
+    """
   # Convert image to grayscale
     gray = cv2.cvtColor(face,cv2.COLOR_BGR2GRAY)
   # Use canny edge detection
@@ -96,6 +97,10 @@ def bordure_detection(face, cal):
 
 
 def im_croping(X, Y, img):
+    """Crops the image based on the min and max coordinates of the vertical lines which are the
+     cadran of the face sketch, and then adds margins.
+    Returns the newly cropped image
+    """
     left = np.min(X)
     top = np.min(Y)
     right = np.max(X)
@@ -105,8 +110,10 @@ def im_croping(X, Y, img):
     return img_res
 
 
-# Annotation detection and storage
 def calibration():
+    """Uses the reference image as a caliber for analyzed images 
+    Returns the caliber image
+    """
     path = os.getcwd()
     ref_path = path + "/Face_report/Reference/Reference.PNG"
     sample = Image.open(ref_path)
@@ -125,6 +132,9 @@ def calibration():
 
 
 def check_annotation(contour, cross_dots):
+    """Selects the mean coordinates of an annotation. Checks if they are out of margins area.
+    Returns the check validation and the center coordinates
+    """
     check, margins = False, 25
     col_center = np.mean(contour[:, 1], dtype=int)
     row_center = np.mean(contour[:, 0], dtype=int)
@@ -135,11 +145,14 @@ def check_annotation(contour, cross_dots):
         return check, row_center, col_center
     else:
         check = True
-    # selection of a plausible area to make sur to not select a small stain as a contour
-    #if row_center > cross_dots.shape[0] * 2/5:
-    #    check = True
-    #elif col_center > cross_dots.shape[1] * 2/5 and col_center < cross_dots.shape[1] * 3/5:
-    #    check = True
+
+    # This section is in case of you would like to focus only on a particular area of the face:
+        # selection of a plausible area to make sur to not select a small stain as a contour
+        #if row_center > cross_dots.shape[0] * 2/5:
+        #    check = True
+        #elif col_center > cross_dots.shape[1] * 2/5 and col_center < cross_dots.shape[1] * 3/5:
+        #    check = True
+
     return check, row_center, col_center
 
 
@@ -169,6 +182,9 @@ def duplicates_finder(contours_storage):
 
 
 def ellipsis_filter(centers, im_thresh):
+    """Checks if the annotation is within an ellipsis shape fitting the actual face shape.
+    Returns the centers within the ellipsis shape
+    """
     a = round(np.shape(im_thresh)[0]/2)
     b = round(np.shape(im_thresh)[1]/2)
     def y(x):
@@ -187,6 +203,10 @@ def ellipsis_filter(centers, im_thresh):
 
 
 def image_threshold(img_res, im_cal):
+    """Takes the cropped image, converts to RGB (useful for PNG with a 4th channel), then to
+     grayscale, puts it the the caliber image size and uses a threshold
+    Returns the binary image
+    """
     im_test_rgb = img_res.convert('RGB')
     im_test_gray = color.rgb2gray(im_test_rgb)
     im_test_gray = resize(im_test_gray, (np.shape(im_cal)[0], np.shape(im_cal)[1]))
@@ -196,6 +216,9 @@ def image_threshold(img_res, im_cal):
 
 
 def cross_cricles(im_thresh, dilated_mask):
+    """Uses the mask from reference image to get rid of everything but the annotation
+    Returns the 'just annotation' image
+    """
     cross_dots = dilated_mask - np.array(im_thresh)*1
     cross_dots = np.where((cross_dots==-1), 0, cross_dots)
     cross_dots = np.where((cross_dots==0)|(cross_dots==1), cross_dots^1, cross_dots)
@@ -205,6 +228,9 @@ def cross_cricles(im_thresh, dilated_mask):
 
 
 def store_contours(cross_dots):
+    """Identifies all the contours in the image
+    Returns the list of contours
+    """
     cs = list()
     contours = measure.find_contours(cross_dots)
     for contour in contours:
@@ -216,6 +242,9 @@ def store_contours(cross_dots):
 
 
 def circles_detector(cross_dots):
+    """Detects and stores the circle shape annotations in the image.
+    Returns circle(s) center(s) list
+    """
     # finds the circles in the grayscale image using the Hough transform
     circles = cv2.HoughCircles(image=cross_dots, method=cv2.HOUGH_GRADIENT, dp=2, 
                                 minDist=20, param1=300, param2=10, minRadius=2, maxRadius=30)
@@ -235,6 +264,10 @@ def circles_detector(cross_dots):
 
 
 def sep_cross(contours_storage, circle_centers, im_thresh):
+    """Compares the all annotation and circles lists to keep only non-circles centers from the
+     1st list. Allocates those centers to the cross(es) center(s) list.
+    Returns the cross(es) center(s) list
+    """
     cross_centers = contours_storage.copy()
 
     for i in range(len(cross_centers)):
@@ -250,10 +283,17 @@ def sep_cross(contours_storage, circle_centers, im_thresh):
 
 
 def round_coord(centers):
+    """Rounds the coordinates because we do not need to be that precise. It is also interesting
+     for comparing to manual analysis.
+    Returns rounded coordinates
+    """
     centers = [(int(np.round(c[0], -1)), int(np.round(c[1], -1))) for c in centers]
     return centers
 
 def update_df(coord_df, circle_centers, cross_centers, file_id, local_im):
+    """Updates the results dataframe with the image results
+    Returns the updated dataframe
+    """
     # initialize the two dataframes
     df_o, df_x = pd.DataFrame(), pd.DataFrame()
     # round the coordinates
@@ -279,6 +319,9 @@ def update_df(coord_df, circle_centers, cross_centers, file_id, local_im):
 
 
 def non_nominal_update_df(coord_df, message, file_id, local_im):
+    """Updates the results dataframe with information on the non-nominal result for this image
+    Returns the updated dataframe
+    """
     # update the global dataframe with non nominal case report
     df = pd.DataFrame(columns=['tuple_coord', 'coord_x', 'coord_y', 'type', 'file_id', 'file_name'])
     df.loc[0] = [np.nan, np.nan, np.nan, message, file_id, local_im]
@@ -287,13 +330,17 @@ def non_nominal_update_df(coord_df, message, file_id, local_im):
 
 
 def pd_to_csv(coord_df):
-    # save the global dataframe as a csv file
+    """Transforms the pandas dataframe to a csv file and saves it.
+    Returns nothing
+    """
     path = os.getcwd()
     coord_df.to_csv(path+'/Face_report/cross_circles_coord.csv', index=False)
 
 
 def verification_by_image(images_to_test, coord_df):
-    # stores the algorithm analysis for each image as a plot
+    """Stores the algorithm analysis for each image as a plot
+    Returns nothing
+    """
     id=0
     for im in images_to_test:
         cimg = im.copy()
@@ -316,8 +363,10 @@ def verification_by_image(images_to_test, coord_df):
 
 
 def compil_cross_and_circles(coord_df, im_cal):
-    # plot and save the compilation of all circles and cross coordinates
-    a = 0.08; s = 100
+    """Plots and save the compilation of all circles and cross coordinates
+    Returns nothing
+    """
+    a = 0.5; s = 100
     data1 = coord_df[coord_df['type']=='circle']
     data2 = coord_df[coord_df['type']=='cross']
 
