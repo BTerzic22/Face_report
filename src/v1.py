@@ -10,6 +10,37 @@ from skimage import morphology
 import glob, cv2, os, time
 
 
+def user_set():
+    disk = (12,         # Outer erosion of the mask. The higher it is, the more information is lost
+                        # but the higher it fits to a bad image scan.
+             8          # Inner erosion of the mask. lower than outer to loose less details in the
+                        # center of the face.
+             )
+    lines_param = (40,  # Min line length. To increase with image size.
+                   15   # Max line gap. To increase with image size.
+                    )
+    abs_dist = 2        # The tolerated gab of pixel in x axis between beginning and end of a vertical line. 
+                        # The closer to 0, the more perfectly vertical your scanned lines have to be.
+                        # With high sized images, it may be better to increase this value a bit
+    
+    delta_crop = 10     # The white pixels to add on your croped image size
+
+    margins = 25        # The distance form the sides where no annotation should be taken into account
+    
+    duplicate_dist = 12 # The distance within which two contours are considered to be the same.
+                        # You may want to increase it with the image size
+                         
+    circles_param = (20,# The min dist between circles. To increase with image size.
+                     10,# The 2nd Hough estimator. The lower, the more circles it identifies.
+                      2,# Min radius of a circle (depends on image size and the annotation wanted)
+                     30 # Max radius of a circle
+                    )
+
+    shape_dist = 12     # The distance between a circle's center and a contour's center within which
+                        # the contour is identified as this circle.
+    return disk, lines_param, abs_dist, delta_crop, margins, duplicate_dist, circles_param, shape_dist    
+    
+    
 def df_creator():
     """Creates the dataframe to store analysis results
     Returns the dataframe
@@ -19,16 +50,16 @@ def df_creator():
     return coord_df
 
 
-def mask_dilution(im_cal):
+def mask_dilution(im_cal, disk):
     """Modifies the reference image to create a mask which will be used on images to analyse
     Returns the mask
     """
     # make a copy of ref image
     dilated_mask = im_cal.copy()
     lim_left, lim_right = round(im_cal.shape[1]*1/4), round(im_cal.shape[1]*3/4)
-    dil_left = morphology.erosion(im_cal[:, :lim_left], morphology.disk(12))
-    dil_right = morphology.erosion(im_cal[:, lim_right:], morphology.disk(12))
-    dil_inner = morphology.erosion(im_cal[:, lim_left:lim_right], morphology.disk(8))
+    dil_left = morphology.erosion(im_cal[:, :lim_left], morphology.disk(disk[0]))
+    dil_right = morphology.erosion(im_cal[:, lim_right:], morphology.disk(disk[0]))
+    dil_inner = morphology.erosion(im_cal[:, lim_left:lim_right], morphology.disk(disk[1]))
     # update the mask with the eroded areas
     dilated_mask[:, lim_right:] = dil_right
     dilated_mask[:, :lim_left] = dil_left
@@ -38,20 +69,20 @@ def mask_dilution(im_cal):
     return dilated_mask
 
 
-def initialize():
+def initialize(lines_param, abs_dist, disk, delta_crop):
     """Initializes the variables needed for the program
     Returns those variables
     """
-    im_cal = calibration()
+    im_cal = calibration(lines_param, abs_dist, delta_crop)
     coord_df = df_creator()
     file_id, images_to_test = 0, list()
     path = os.getcwd()
-    local_im_list = glob.glob(path + "/Face_report/v1/*.PNG")
-    dilated_mask = mask_dilution(im_cal)
+    local_im_list = glob.glob(path + "/Face_report/v1/*.PNG") # add a .png too
+    dilated_mask = mask_dilution(im_cal, disk)
     return im_cal, coord_df, file_id, images_to_test, local_im_list, dilated_mask
 
 
-def bordure_detection(face, cal):
+def bordure_detection(face, lines_param, abs_dist, cal):
     """Detects the vertical lines in the image which will be used later for cropping. If nothing
      is detected, an error value will be returned.
     Returns the coordinates and the error statement
@@ -66,8 +97,8 @@ def bordure_detection(face, cal):
               1.5, # Distance resolution in pixels
               np.pi/180, # Angle resolution in radians
               threshold=40, # Min number of votes for valid line
-              minLineLength=40, # Min allowed length of line
-              maxLineGap=15 # Max allowed gap between line for joining them
+              minLineLength=lines_param[0], # Min allowed length of line
+              maxLineGap=lines_param[1] # Max allowed gap between line for joining them
               )
     
     X, Y = list(), list()
@@ -80,7 +111,7 @@ def bordure_detection(face, cal):
         # Get margins
         # Select only vertical lines for non ref image
         if cal==0:
-          if y1 != y2 and np.abs(x1-x2) <= 2:
+          if y1 != y2 and np.abs(x1-x2) <= abs_dist:
             X.append(x1); X.append(x2)
             Y.append(y1); Y.append(y2)
         # Select only vertical lines for ref image
@@ -96,7 +127,7 @@ def bordure_detection(face, cal):
     return X, Y, error
 
 
-def im_croping(X, Y, img):
+def im_croping(X, Y, img, delta_crop):
     """Crops the image based on the min and max coordinates of the vertical lines which are the
      cadran of the face sketch, and then adds margins.
     Returns the newly cropped image
@@ -105,12 +136,11 @@ def im_croping(X, Y, img):
     top = np.min(Y)
     right = np.max(X)
     bottom = np.max(Y)
-    delta = 10
-    img_res = img.crop((left - delta, top - delta, right + delta, bottom + delta)) 
+    img_res = img.crop((left - delta_crop, top - delta_crop, right + delta_crop, bottom + delta_crop)) 
     return img_res
 
 
-def calibration():
+def calibration(lines_param, abs_dist, delta_crop):
     """Uses the reference image as a caliber for analyzed images 
     Returns the caliber image
     """
@@ -118,10 +148,10 @@ def calibration():
     ref_path = path + "/Face_report/Reference/Reference.PNG"
     sample = Image.open(ref_path)
     np_sample = np.array(sample)
-    X_cal, Y_cal, error = bordure_detection(np_sample, cal=1)
+    X_cal, Y_cal, error = bordure_detection(np_sample, lines_param, abs_dist, cal=1)
     if error == 1:
         print('There is an issue with the reference image.')
-    im_with_face = im_croping(X_cal, Y_cal, sample)
+    im_with_face = im_croping(X_cal, Y_cal, sample, delta_crop)
     im_test_rgb = im_with_face.convert('RGB')
 
     # Convert into grayscale image
@@ -131,11 +161,11 @@ def calibration():
     return im_cal
 
 
-def check_annotation(contour, cross_dots):
+def check_annotation(contour, cross_dots, margins):
     """Selects the mean coordinates of an annotation. Checks if they are out of margins area.
     Returns the check validation and the center coordinates
     """
-    check, margins = False, 25
+    check = False
     col_center = np.mean(contour[:, 1], dtype=int)
     row_center = np.mean(contour[:, 0], dtype=int)
     # eliminate contour within the margins on image sides
@@ -156,7 +186,7 @@ def check_annotation(contour, cross_dots):
     return check, row_center, col_center
 
 
-def duplicates_finder(contours_storage):
+def duplicates_finder(contours_storage, duplicate_dist):
     ''' Eliminates a value when it is spacially too close to another. This is to prevent us from having
     two annotations where the algorithm should only have detected one.
 
@@ -173,8 +203,8 @@ def duplicates_finder(contours_storage):
             if center == contours_storage[i] or center in del_list:
                 i+=1
                 continue
-            elif center[0] >= (contours_storage[i][0] - 12) and center[0] <= (contours_storage[i][0] + 12):
-                if center[1] >= (contours_storage[i][1] - 12) and center[1] <= (contours_storage[i][1] + 12):
+            elif center[0] >= (contours_storage[i][0] - duplicate_dist) and center[0] <= (contours_storage[i][0] + duplicate_dist):
+                if center[1] >= (contours_storage[i][1] - duplicate_dist) and center[1] <= (contours_storage[i][1] + duplicate_dist):
                     del_list.append(contours_storage[i])
             i+=1
         contours_storage = [var for var in contours_storage if var not in del_list]
@@ -227,44 +257,46 @@ def cross_cricles(im_thresh, dilated_mask):
     return cross_dots
 
 
-def store_contours(cross_dots):
+def store_contours(cross_dots, margins, duplicate_dist):
     """Identifies all the contours in the image
     Returns the list of contours
     """
     cs = list()
     contours = measure.find_contours(cross_dots)
     for contour in contours:
-        check, row_center, col_center = check_annotation(contour, cross_dots)
+        check, row_center, col_center = check_annotation(contour, cross_dots, margins)
         if check == True:
             cs.append((row_center, col_center))
-    contours_storage = duplicates_finder(cs)
+    contours_storage = duplicates_finder(cs, duplicate_dist)
     return contours_storage
 
 
-def circles_detector(cross_dots):
+def circles_detector(cross_dots, circles_param, duplicate_dist):
     """Detects and stores the circle shape annotations in the image.
     Returns circle(s) center(s) list
     """
     # finds the circles in the grayscale image using the Hough transform
     circles = cv2.HoughCircles(image=cross_dots, method=cv2.HOUGH_GRADIENT, dp=2, 
-                                minDist=20, param1=300, param2=10, minRadius=2, maxRadius=30)
+                                minDist=circles_param[0], param1=300, param2=circles_param[1], 
+                                minRadius=circles_param[2], maxRadius=circles_param[3])
     circle_centers=list()
 
     if circles is not None:
         # Convert the circle parameters a, b and r to integers.
         circles = np.uint16(np.around(circles))
 
+        # Additional step to remove misidentified circles (i.e: a circle center should be blank)
         for pt in circles[0, :]:
             a, b = pt[0], pt[1]
             if cross_dots[b, a] != 255:
                 circle_centers.append((b,a))
     # find duplicates
-    circle_centers = duplicates_finder(circle_centers)
+    circle_centers = duplicates_finder(circle_centers, duplicate_dist)
     return circle_centers
 
 
-def sep_cross(contours_storage, circle_centers, im_thresh):
-    """Compares the all annotation and circles lists to keep only non-circles centers from the
+def sep_cross(contours_storage, circle_centers, im_thresh, shape_dist):
+    """Compares all the annotation and circles lists to keep only non-circles centers from the
      1st list. Allocates those centers to the cross(es) center(s) list.
     Returns the cross(es) center(s) list
     """
@@ -272,7 +304,10 @@ def sep_cross(contours_storage, circle_centers, im_thresh):
 
     for i in range(len(cross_centers)):
         for j in range(len(circle_centers)):
-            if (cross_centers[i][0] >= circle_centers[j][0]-10) and (cross_centers[i][1] >= circle_centers[j][1]-10) and (cross_centers[i][0] <= circle_centers[j][0]+10) and (cross_centers[i][1] <= circle_centers[j][1]+10):
+            if (cross_centers[i][0] >= circle_centers[j][0]-shape_dist)  \
+            and (cross_centers[i][1] >= circle_centers[j][1]-shape_dist) \
+            and (cross_centers[i][0] <= circle_centers[j][0]+shape_dist) \
+            and (cross_centers[i][1] <= circle_centers[j][1]+shape_dist):
                 cross_centers[i] = (0,0)
     cross_centers = [i for i in cross_centers if i != (0, 0)]
     cross_centers = ellipsis_filter(cross_centers, im_thresh)
@@ -392,7 +427,8 @@ def compil_cross_and_circles(coord_df, im_cal):
 
 def main():
     # Initialize
-    im_cal, coord_df, file_id, images_to_test, local_im_list, dilated_mask = initialize()
+    disk, lines_param, abs_dist, delta_crop, margins, duplicate_dist, circles_param, shape_dist = user_set()
+    im_cal, coord_df, file_id, images_to_test, local_im_list, dilated_mask = initialize(lines_param, abs_dist, disk, delta_crop)
     # iterate through the pdf list
     for local_im in local_im_list:
         print('-------------- ', 'image {} over {}'.format(file_id+1, len(local_im_list)), ' --------------')
@@ -401,7 +437,7 @@ def main():
         np_im = np.array(im)
 
         # crop the image
-        X, Y, error = bordure_detection(np_im, cal=0)
+        X, Y, error = bordure_detection(np_im, lines_param, abs_dist, cal=0)
         if error == 1:
             print("error in face detection!")
             message='Did not manage to detect a face'
@@ -409,13 +445,12 @@ def main():
             images_to_test.append(im_thresh)
             file_id+=1
             continue
-        img_res = im_croping(X, Y, im)
+        img_res = im_croping(X, Y, im, delta_crop)
 
         # prepare the image and get the annotations
         im_thresh = image_threshold(img_res, im_cal)
         cross_dots = cross_cricles(im_thresh, dilated_mask)
-        #plt.imshow(cross_dots, cmap=plt.cm.gray)
-        #plt.show()
+        
         # no need to find contours if there is no mark
         if np.mean(cross_dots)==255:
             print("No marks detected!")
@@ -425,7 +460,7 @@ def main():
             file_id+=1
             continue
 
-        contours_storage = store_contours(cross_dots)
+        contours_storage = store_contours(cross_dots, margins, duplicate_dist)
         # if there are too many marks we assume there is a problem reading the file
         if len(contours_storage) > 10:
             print("There is probably an issue processing this image. We skip it for safety.")
@@ -436,10 +471,10 @@ def main():
             continue
 
         # find the circles
-        circle_centers = circles_detector(cross_dots)
+        circle_centers = circles_detector(cross_dots, circles_param, duplicate_dist)
 
         # determine the cross as non-circle annotations
-        cross_centers = sep_cross(contours_storage, circle_centers, im_thresh)
+        cross_centers = sep_cross(contours_storage, circle_centers, im_thresh, shape_dist)
 
         # get the coordinates in a pandas dataframe
         if len(circle_centers)==0 and len(cross_centers)==0:
