@@ -1,4 +1,4 @@
-# An automated way to get insights from face pictures
+# An automated way to get insights from face sketches
 
 In a previous job, I had to go through a consequent amount of files to get some information. This meant opening pdf or other formats one after another to go to a specific schema and note what might be noted on it. This is truly time consumming.
 
@@ -13,8 +13,10 @@ The algorithm should perform the following tasks:
 -   store the results.
 
 ## V1:
-The actual version of the code is only working to extract insights from png images in a repository.
-A new version will be realesed to work with pdf.
+Works with png files.
+
+## V2:
+Works with pdf files.
 
 Here is a sample of the current result:
 ![GitHub projects](https://user-images.githubusercontent.com/104162893/185877030-e8767580-8e25-44e5-ba1c-cec10eb32f33.jpg)
@@ -23,7 +25,6 @@ Here is a sample of the current result:
 - A bad scan prevent a good cropping. In those cases it is detected by the program.
 - A blank page or schema without annotations is anticipated and also reported in the csv file.
 - Rotated images are skipped by the program, a technique to deal with it is currently tested.
-- Circles are sometime difficult to distinguished from cross or other shapes. A bad drawing may be an issue.
 
 **How to use the code**:
 - Before executing the code you should:
@@ -31,6 +32,7 @@ Here is a sample of the current result:
     - Have your model image in the Reference folder.
     - Have an empty Analysis_report folder.
     - Change the parameters to adapt it to your files (i.e: the CV2 Houghlines and Houghcircles functions parameters, the spaces between duplicates) --> see in post scriptum.
+    - Make sure to be in the Face_report repository before running the script in your terminal.
 - What you get after executing the code:
     - A csv file (cross_circles_coord.csv) with each file id with its original name from v1 folder, the coordinates of each annotation an image has and its type, and a message explaining if nothing was extracted from an image.
     - An image (Compilation.jpeg) with the visual compilation of all cross on one face and all circles on another.
